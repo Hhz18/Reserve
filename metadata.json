@@ -1,0 +1,5 @@
+{
+  "name": "纠错系统",
+  "description": "A Neo-Brutalism styled personal growth tool focusing on spaced repetition (Ebbinghaus) for vocabulary, algorithm review, and custom correction systems. Features Gemini AI integration for automatic translation.",
+  "requestFramePermissions": []
+}
