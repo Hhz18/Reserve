@@ -20,6 +20,32 @@ import { AppProvider, useAppContext } from './contexts/AppContext';
 const DEFAULT_EMAIL = '2307567045@qq.com';
 const DEFAULT_PASS = 'jfbkn681';
 
+// Typewriter Component for the effect
+const TypewriterText = ({ text }: { text: string }) => {
+  const [displayed, setDisplayed] = useState('');
+  
+  useEffect(() => {
+    setDisplayed('');
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        setDisplayed((prev) => prev + text.charAt(i));
+        i++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 50); // Speed
+    return () => clearInterval(timer);
+  }, [text]);
+
+  return (
+    <span className="font-mono">
+      {displayed}
+      <span className="animate-pulse">_</span>
+    </span>
+  );
+};
+
 const AppContent: React.FC = () => {
   const { t, globalTheme } = useAppContext();
   const [user, setUser] = useState<User | null>(null);
@@ -33,14 +59,17 @@ const AppContent: React.FC = () => {
   const [email, setEmail] = useState(DEFAULT_EMAIL);
   const [password, setPassword] = useState(DEFAULT_PASS);
   const [authError, setAuthError] = useState('');
-
-  // Landing Page Interactive State
+  
+  // UI Interaction States
+  const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeCube, setActiveCube] = useState<string | null>(null);
 
   // Create System State
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [newSystemName, setNewSystemName] = useState('');
   const [newSystemType, setNewSystemType] = useState<'vocab' | 'algo' | 'custom'>('custom');
+  const [newSystemTheme, setNewSystemTheme] = useState<ThemeColor>('amber');
 
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -49,19 +78,32 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Strategy: Try Login First. 
+        // If it succeeds, the user exists. 
+        // If it fails, try Register (auto-create the demo user).
         try {
-          await register(DEFAULT_EMAIL, DEFAULT_PASS);
-        } catch (e: any) {
-          if (e.message !== 'User already exists') {
-            console.warn("Auto-registration warning:", e);
-          }
+          const u = await login(DEFAULT_EMAIL, DEFAULT_PASS);
+          setUser(u);
+          refreshSystems(u.id);
+          setCurrentView('dashboard');
+          setIsLoading(false);
+          return;
+        } catch (loginError) {
+          // console.log("Auto-login failed, attempting registration...");
         }
-        const u = await login(DEFAULT_EMAIL, DEFAULT_PASS);
-        setUser(u);
-        refreshSystems(u.id);
-        setCurrentView('dashboard'); // Default to Dashboard
+
+        // Login failed, try to register
+        try {
+          const u = await register(DEFAULT_EMAIL, DEFAULT_PASS);
+          setUser(u);
+          refreshSystems(u.id);
+          setCurrentView('dashboard');
+        } catch (regError: any) {
+          console.warn("Auto-registration failed:", regError.message);
+          // If both fail, user remains null and sees login screen
+        }
       } catch (err) {
-        console.error("Auto-login failed:", err);
+        console.error("Critical Auth Init Error:", err);
       } finally {
         setIsLoading(false);
       }
@@ -88,7 +130,11 @@ const AppContent: React.FC = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
+    setIsSubmitting(true);
     try {
+      // Simulate API Pulse/Computation
+      await new Promise(r => setTimeout(r, 1200));
+
       let u: User;
       if (authMode === 'login') {
         u = await login(email, password);
@@ -100,6 +146,8 @@ const AppContent: React.FC = () => {
       setCurrentView('dashboard');
     } catch (err: any) {
       setAuthError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -109,7 +157,7 @@ const AppContent: React.FC = () => {
       userId: user.id,
       name: newSystemName,
       type: newSystemType,
-      theme: globalTheme,
+      theme: newSystemTheme,
       icon: ICONS[newSystemType] || 'star'
     });
     refreshSystems(user.id);
@@ -158,6 +206,9 @@ const AppContent: React.FC = () => {
         }}
       >
         
+        {/* Decorative Grid Overlay for Sci-Fi Feel */}
+        <div className="absolute inset-0 bg-tech-grid opacity-20 pointer-events-none"></div>
+
         {/* Stars Generation - Base Layer */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {Array.from({ length: 150 }).map((_, i) => (
@@ -177,7 +228,7 @@ const AppContent: React.FC = () => {
             ))}
         </div>
 
-        {/* Nebula Dust - Layer 2 (Atmosphere) - Synced with Theme */}
+        {/* Nebula Dust */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {Array.from({ length: 8 }).map((_, i) => (
                 <div 
@@ -197,68 +248,11 @@ const AppContent: React.FC = () => {
             ))}
         </div>
 
-        {/* Shooting Stars */}
+        {/* Dynamic Galaxies */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-             {Array.from({ length: 4 }).map((_, i) => (
-                <div 
-                    key={`shoot-${i}`}
-                    className="absolute bg-gradient-to-l from-transparent via-white to-transparent animate-shooting-star opacity-0"
-                    style={{
-                        height: '1px',
-                        width: '120px',
-                        left: `${Math.random() * 60 + 20}%`, 
-                        top: `${Math.random() * 60}%`, 
-                        animationDuration: `${Math.random() * 15 + 8}s`,
-                        animationDelay: `${Math.random() * 10}s`
-                    }}
-                />
-             ))}
-        </div>
-
-        {/* Dynamic Galaxies (Previously Planets) - Synced with Theme */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-             {/* Large Galaxy Top Left */}
-             <Planet 
-                color1={palette.light} 
-                color2="#ffffff" 
-                size={200} 
-                top="10%" 
-                left="10%" 
-                orbitDuration="120s" 
-             />
-             
-             {/* Medium Galaxy Bottom Right */}
-             <Planet 
-                color1={palette.light} 
-                color2={palette.border} 
-                size={160} 
-                top="65%" 
-                left="75%" 
-                orbitDuration="90s" 
-                delay="2s"
-             />
-
-             {/* Small Galaxy Bottom Left */}
-             <Planet 
-                color1="#ffffff" 
-                color2={palette.light} 
-                size={120} 
-                top="75%" 
-                left="15%" 
-                orbitDuration="80s" 
-                delay="5s"
-             />
-             
-             {/* Distant Galaxy Top Right */}
-             <Planet 
-                color1={palette.border} 
-                color2="#ffffff" 
-                size={80} 
-                top="20%" 
-                left="80%" 
-                orbitDuration="150s" 
-                delay="10s"
-             />
+             <Planet color1={palette.light} color2="#ffffff" size={200} top="10%" left="10%" orbitDuration="120s" />
+             <Planet color1={palette.light} color2={palette.border} size={160} top="65%" left="75%" orbitDuration="90s" delay="2s" />
+             <Planet color1="#ffffff" color2={palette.light} size={120} top="75%" left="15%" orbitDuration="80s" delay="5s" />
         </div>
 
         {/* Static Logo Top Left */}
@@ -267,7 +261,7 @@ const AppContent: React.FC = () => {
         </div>
 
         {/* Main Card Container with Corner Cubes */}
-        <div className="relative z-20">
+        <div className="relative z-20 perspective-1000">
             
             {/* Backdrop for Active Cube Mode */}
             <div 
@@ -281,6 +275,7 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* Corner Cubes representing the Loop */}
+            {/* INPUT: Highlights on Email Focus */}
             <CornerCube 
                 label="INPUT" 
                 position="top-left" 
@@ -288,7 +283,9 @@ const AppContent: React.FC = () => {
                 onClick={() => setActiveCube(activeCube === 'INPUT' ? null : 'INPUT')}
                 isActive={activeCube === 'INPUT'}
                 isDimmed={activeCube !== null && activeCube !== 'INPUT'}
+                isHighlighted={focusedField === 'email'}
             />
+            {/* SYSTEM: Highlights on Submit (Processing) */}
             <CornerCube 
                 label="SYSTEM" 
                 position="top-right" 
@@ -296,7 +293,9 @@ const AppContent: React.FC = () => {
                 onClick={() => setActiveCube(activeCube === 'SYSTEM' ? null : 'SYSTEM')}
                 isActive={activeCube === 'SYSTEM'}
                 isDimmed={activeCube !== null && activeCube !== 'SYSTEM'}
+                isHighlighted={isSubmitting}
             />
+            {/* OUTPUT: Could highlight on success (omitted for now to keep simple) */}
             <CornerCube 
                 label="OUTPUT" 
                 position="bottom-right" 
@@ -304,7 +303,9 @@ const AppContent: React.FC = () => {
                 onClick={() => setActiveCube(activeCube === 'OUTPUT' ? null : 'OUTPUT')}
                 isActive={activeCube === 'OUTPUT'}
                 isDimmed={activeCube !== null && activeCube !== 'OUTPUT'}
+                isHighlighted={false} 
             />
+            {/* REVIEW: Highlights on Password Focus (Simulating checking credentials) */}
             <CornerCube 
                 label="REVIEW" 
                 position="bottom-left" 
@@ -312,45 +313,75 @@ const AppContent: React.FC = () => {
                 onClick={() => setActiveCube(activeCube === 'REVIEW' ? null : 'REVIEW')}
                 isActive={activeCube === 'REVIEW'}
                 isDimmed={activeCube !== null && activeCube !== 'REVIEW'}
+                isHighlighted={focusedField === 'password'}
             />
 
-            {/* Login Card - Styled Dark */}
-            <div className={`w-[380px] md:w-[450px] bg-nb-white border-4 border-nb-black shadow-nb-lg rounded-2xl p-8 md:p-12 relative transition-all duration-500 hover:shadow-2xl hover:scale-[1.01] hover:-translate-y-1 ${activeCube ? 'scale-90 opacity-0 blur-sm pointer-events-none' : 'opacity-100'}`}>
+            {/* Login Card - Styled Dark with Hard Shadows & Tech Aesthetics */}
+            <div className={`w-[380px] md:w-[450px] bg-nb-white border-4 border-nb-black shadow-nb-hard rounded-lg p-8 md:p-12 relative transition-all duration-500 hover:scale-[1.01] hover:-translate-y-1 ${activeCube ? 'scale-90 opacity-0 blur-sm pointer-events-none' : 'opacity-100'}`}>
                 
-                <h2 className="text-3xl font-black text-nb-text mb-2 text-center tracking-tighter uppercase">
+                {/* Tech Status Labels */}
+                <div className="absolute top-2 left-3 text-[9px] font-mono text-nb-text opacity-40">[STATUS: ONLINE]</div>
+                <div className="absolute top-2 right-3 text-[9px] font-mono text-nb-text opacity-40">[v2.4.0]</div>
+                <div className="absolute bottom-2 right-3 text-[9px] font-mono text-nb-text opacity-40">[SECURE]</div>
+
+                {/* Corner Decorations */}
+                <div className="absolute top-0 left-0 w-6 h-6 border-l-4 border-t-4 border-nb-theme"></div>
+                <div className="absolute bottom-0 right-0 w-6 h-6 border-r-4 border-b-4 border-nb-theme"></div>
+
+                <h2 className="text-3xl font-black text-nb-text mb-2 text-center tracking-tighter uppercase mt-4">
                     {authMode === 'login' ? 'Welcome Back' : 'Join Loop'}
                 </h2>
-                <p className="text-nb-text opacity-60 font-mono text-xs text-center mb-8">
-                    {authMode === 'login' ? 'Optimization Protocol Initiated' : 'Initialize New Agent'}
-                </p>
+                <div className="text-nb-theme font-mono text-xs text-center mb-8 h-6">
+                    <TypewriterText text={authMode === 'login' ? 'Optimization Protocol Initiated...' : 'Initialize New Agent Sequence...'} />
+                </div>
 
                 <form onSubmit={handleAuth} className="space-y-6">
-                    <div>
+                    <div className="relative group">
                         <label className="block font-bold mb-1 text-nb-theme text-xs uppercase tracking-wider">{t('auth.email')}</label>
-                        <input 
-                            type="email" 
-                            className="w-full border-2 border-nb-black p-4 focus:outline-none focus:shadow-nb focus:-translate-y-1 transition-all rounded-lg bg-nb-bg text-nb-text font-mono text-sm placeholder-white/20"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                            required
-                            placeholder="name@example.com"
-                        />
+                        <div className="relative">
+                            <input 
+                                type="email" 
+                                className="w-full border-2 border-nb-black p-4 focus:outline-none focus:border-nb-theme focus:ring-1 focus:ring-nb-theme transition-all rounded-none bg-nb-bg text-nb-text font-mono text-sm placeholder-white/20"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                onFocus={() => setFocusedField('email')}
+                                onBlur={() => setFocusedField(null)}
+                                required
+                                placeholder="name@example.com"
+                            />
+                            {focusedField === 'email' && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-nb-theme rounded-full animate-ping"></div>}
+                        </div>
                     </div>
-                    <div>
-                        <label className="block font-bold mb-1 text-nb-theme text-xs uppercase tracking-wider">{t('auth.password')}</label>
-                        <input 
-                            type="password" 
-                            className="w-full border-2 border-nb-black p-4 focus:outline-none focus:shadow-nb focus:-translate-y-1 transition-all rounded-lg bg-nb-bg text-nb-text font-mono text-sm placeholder-white/20"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            required
-                            placeholder="••••••••"
-                        />
-                    </div>
-                    {authError && <div className="p-3 bg-red-900/50 border-2 border-red-500 text-red-200 font-bold text-sm rounded">{authError}</div>}
                     
-                    <Button type="submit" className="w-full py-4 text-lg rounded-lg" themeColor={authMode === 'login' ? 'bg-nb-theme' : 'bg-nb-lime'}>
-                        {authMode === 'login' ? t('auth.login') : t('auth.register')}
+                    <div className="relative group">
+                        <label className="block font-bold mb-1 text-nb-theme text-xs uppercase tracking-wider">{t('auth.password')}</label>
+                         <div className="relative">
+                            <input 
+                                type="password" 
+                                className="w-full border-2 border-nb-black p-4 focus:outline-none focus:border-nb-theme focus:ring-1 focus:ring-nb-theme transition-all rounded-none bg-nb-bg text-nb-text font-mono text-sm placeholder-white/20"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                onFocus={() => setFocusedField('password')}
+                                onBlur={() => setFocusedField(null)}
+                                required
+                                placeholder="••••••••"
+                            />
+                            {focusedField === 'password' && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-nb-theme rounded-full animate-ping"></div>}
+                        </div>
+                    </div>
+                    
+                    {authError && <div className="p-3 bg-red-900/50 border-2 border-red-500 text-red-200 font-bold text-sm">{authError}</div>}
+                    
+                    <Button type="submit" disabled={isSubmitting} className="w-full py-4 text-lg rounded-none relative overflow-hidden" themeColor={authMode === 'login' ? 'bg-nb-theme' : 'bg-nb-lime'}>
+                        {isSubmitting ? (
+                             <span className="flex items-center justify-center gap-2">
+                                <span className="animate-spin text-xl">⚙️</span> PROCESSING...
+                             </span>
+                        ) : (
+                             authMode === 'login' ? t('auth.login') : t('auth.register')
+                        )}
+                        {/* Button Shine Effect */}
+                        {!isSubmitting && <div className="absolute top-0 -left-full w-full h-full bg-white/20 -skew-x-12 group-hover:animate-shine transition-all duration-500"></div>}
                     </Button>
                 </form>
 
@@ -443,6 +474,19 @@ const AppContent: React.FC = () => {
                      {t.toUpperCase()}
                    </button>
                  ))}
+              </div>
+            </div>
+            <div>
+              <label className="block font-bold mb-1 text-nb-black text-sm">{t('sys.form.theme')}</label>
+              <div className="flex gap-2 flex-wrap">
+                {Object.keys(THEME_COLORS).map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewSystemTheme(color as ThemeColor)}
+                    className={`w-6 h-6 rounded-full border-2 border-nb-black ${THEME_COLORS[color]} ${newSystemTheme === color ? 'ring-2 ring-offset-1 ring-black' : ''}`}
+                  />
+                ))}
               </div>
             </div>
             <div className="flex justify-end pt-4">

@@ -1,157 +1,110 @@
+# Correction Loop (纠错循环)
 
-# Correction Loop
+**Correction Loop** 是一个基于 React 开发的个人成长应用，采用独特的**新拟态（Neo-Brutalism）**视觉风格，配以动态的太空主题背景。它的设计初衷是通过"输入、系统、输出、复习"的循环，帮助用户优化学习流程。
 
-Correction Loop is a React-based personal growth application using a Neo-Brutalism design style. It helps users manage vocabulary with spaced repetition, track algorithm problems, and create custom review loops.
+## 🚀 核心功能
 
-## Database Schema (PostgreSQL)
+*   **间隔重复 (词汇系统)**：应用艾宾浩斯遗忘曲线（Ebbinghaus Forgetting Curve）来安排词汇的复习计划。
+*   **算法日志 (算法系统)**：支持 Markdown 语法的错题记录器，用于追踪编程挑战和解决方案。
+*   **AI 集成**：集成 Google **Gemini API**，在批量导入词汇时自动进行翻译。
+*   **可视化分析**：带有热力图和统计数据的仪表盘，用于追踪学习势头。
+*   **多主题支持**：动态主题引擎，支持多种配色方案（琥珀色、青柠色、天蓝色、玫瑰色等）以及特定的"深/浅"对比模式。
 
-To deploy with a real backend, use the following schema:
+---
 
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(100) DEFAULT 'Asig',
-    avatar_url TEXT,
-    address VARCHAR(255),
-    birth_date DATE,
-    gender VARCHAR(20), -- 'male', 'female', 'other', 'secret'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+## 📂 项目结构
 
-CREATE TABLE systems (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL, -- 'vocab', 'algo', 'custom'
-    name VARCHAR(100) NOT NULL,
-    theme_color VARCHAR(50) DEFAULT 'amber',
-    icon VARCHAR(50) DEFAULT 'default',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE review_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    system_id UUID REFERENCES systems(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL, -- The word or problem title
-    content TEXT, -- Translation, Markdown notes, or details
-    group_name VARCHAR(100), -- e.g., "Chapter 1"
-    
-    -- Spaced Repetition Fields
-    status VARCHAR(50) DEFAULT 'new', -- 'new', 'learning', 'mastered'
-    review_count INTEGER DEFAULT 0,
-    next_review_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_reviewed_at TIMESTAMP WITH TIME ZONE,
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+```text
+/
+├── components/          # 可复用 UI 组件
+│   ├── ui/              # 基础元素：按钮、模态框、主题切换器
+│   └── visual/          # 视觉特效：角立方体、星球、循环连接线、热力图
+├── contexts/            # 全局状态管理
+│   └── AppContext.tsx   # 处理语言 (i18n) 和全局主题状态
+├── pages/               # 主要应用视图
+│   ├── Dashboard.tsx    # 统计数据与热力图
+│   ├── VocabSystem.tsx  # 词汇闪卡逻辑
+│   ├── AlgoSystem.tsx   # 算法错题记录逻辑
+│   └── UserProfile.tsx  # 用户身份管理
+├── services/            # 业务逻辑与数据持久化
+│   ├── dataService.ts   # LocalStorage 包装器 (模拟后端)
+│   └── geminiService.ts # Google Gemini AI 集成
+├── types.ts             # TypeScript 接口 (模型)
+├── constants.ts         # 配置 (颜色、间隔、图标)
+├── translations.ts      # i18n 字典 (中/英)
+├── App.tsx              # 主入口与路由逻辑
+└── index.html           # HTML 入口与 Tailwind 配置
 ```
 
-## API Interfaces
+---
 
-### `POST /api/auth/register`
-- Body: `{ email, password }`
-- Response: `{ token, user }`
+## 💾 存储技术
 
-### `POST /api/auth/login`
-- Body: `{ email, password }`
-- Response: `{ token, user }`
+该应用程序目前使用浏览器端的 **LocalStorage** 来持久化数据，模拟关系型数据库的结构。这使得应用可以在离线状态下运行，无需部署后端服务器即可进行演示。
 
-### `GET /api/users/me`
-- Headers: `Authorization: Bearer <token>`
-- Response: `User` (including profile fields)
+| 存储键 (Key) | 描述 | JSON 结构 (简化) |
+| :--- | :--- | :--- |
+| `cl_users` | 用户账户与个人资料 | `[{ id, email, password, name, avatar... }]` |
+| `cl_systems` | 学习系统 (卡组/分类) | `[{ id, userId, type, name, theme }]` |
+| `cl_items` | 闪卡与题目 | `[{ id, systemId, title, content, status, nextReviewAt }]` |
 
-### `PUT /api/users/me`
-- Headers: `Authorization: Bearer <token>`
-- Body: `{ name, avatar, address, birthDate, gender }`
-- Description: Updates user profile information.
-- Response: `User`
+---
 
-### `POST /api/upload/avatar`
-- Headers: `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
-- Body: Form data with file field `file`
-- Description: Uploads an image file to Object Storage (S3/OSS).
-- Response: 
-  ```json
-  {
-    "url": "https://your-bucket.s3.region.amazonaws.com/uploads/user_123_avatar.jpg"
-  }
-  ```
+## 🔌 服务接口 (内部 API)
 
-### `DELETE /api/users/me`
-- Headers: `Authorization: Bearer <token>`
-- Description: Deletes user account and all data.
-- Response: `204 No Content`
+由于没有外部后端服务器，`services/dataService.ts` 充当了 API 层。
 
-### `GET /api/systems`
-- Headers: `Authorization: Bearer <token>`
-- Response: `System[]`
+### 认证与用户 (Authentication & User)
 
-### `POST /api/systems`
-- Headers: `Authorization: Bearer <token>`
-- Body: `{ name, type, theme }`
-- Response: `System`
+*   **`register(email, password)`**
+    *   在 `cl_users` 中创建新用户。
+    *   自动初始化默认系统（词汇和算法）。
+*   **`login(email, password)`**
+    *   验证凭据是否与存储的用户匹配。
+*   **`updateUser(userId, updates)`**
+    *   更新个人资料字段（头像、地址、性别等）。
 
-### `DELETE /api/systems/:id`
-- Headers: `Authorization: Bearer <token>`
-- Description: Deletes a system and all its associated review items.
-- SQL: `DELETE FROM systems WHERE id = $1 AND user_id = $2;`
-- Response: `204 No Content`
+### 系统管理 (System Management)
 
-### `POST /api/systems/:id/items/batch`
-- Body: `{ items: [{ title, content, group_name }] }`
-- Response: `ReviewItem[]`
+*   **`getSystems(userId)`**
+    *   返回属于特定用户的所有学习循环。
+*   **`createSystem(system)`**
+    *   为项目创建一个新的容器（例如："西班牙语词汇"、"LeetCode"）。
+*   **`deleteSystem(systemId)`**
+    *   **级联删除**：从 `cl_items` 中移除该系统以及与之关联的所有项目。
 
-### `PATCH /api/items/:id/review`
-- Body: `{ success: boolean }`
-- Response: `ReviewItem` (updated dates)
+### 项目与复习逻辑 (Item & Review Logic)
 
+*   **`getItems(systemId)`**
+    *   获取特定系统的所有项目。
+*   **`performReview(itemId, success)`**
+    *   **核心逻辑**：处理间隔重复算法。
+    *   如果 `success` (记得)：增加 `reviewCount` 并根据 **艾宾浩斯间隔** (1, 2, 4, 7, 15, 30 天) 设置 `nextReviewAt`。
+    *   如果 `fail` (忘记)：重置 `reviewCount` 为 0 并将 `nextReviewAt` 设置为立即复习。
+*   **`batchCreateItems(items)`**
+    *   用于在批量导入期间一次性创建多张卡片。
 
+### AI 服务 (`geminiService.ts`)
 
+*   **`translateWords(words: string[])`**
+    *   **输入**：英语单词数组。
+    *   **处理**：调用 Google Gemini `gemini-2.5-flash` 模型。
+    *   **输出**：返回一个通用对象 `{ "apple": "苹果", ... }` 用于填充卡片内容。
 
+---
 
+## 🎨 设计系统
 
+应用使用 **新拟态 (Neo-Brutalism)** 设计语言，定义如下：
 
+1.  **硬阴影**：`box-shadow: Xpx Xpx 0px 0px #000` (无模糊)。
+2.  **粗边框**：大多数元素使用 `border-2` 或 `border-4`。
+3.  **高对比度**：使用 `constants.ts` 中定义的严格配色方案。
+4.  **等宽字体**：`Space Mono` 用于数据/标签，`Work Sans` 用于标题。
 
-
-
-
-
-
-
-<!-- 
-你觉得这项目在主页ui上还有什么可以修改的（你只需要给建议，不用直接更改）
-Gemini 3 Pro Preview
-Ran for 77s
-lightbulb
-Thought for 77 seconds
-这是一个非常棒的项目！结合了 Neo-Brutalism（新拟态/新粗野主义） 和 太空/星际 主题，视觉冲击力很强。
-基于目前的代码和视觉效果，为了让主页（登录/注册页）更加惊艳且符合“纠错循环（Correction Loop）”的核心概念，我有以下几个 UI/UX 方面的优化建议：
-1. 强化“流动”与“循环”的视觉隐喻 (The "Loop" Metaphor)
-目前四周有四个方块（INPUT, SYSTEM, OUTPUT, REVIEW）和连接线，这很好，但可以更动感：
-流动的管道 (Flowing Pipelines)：连接这四个方块的虚线不应该是静止的，建议添加 stroke-dashoffset 动画，让虚线像数据流一样顺时针不断流动。这能直观地传达“循环”的概念。
-脉冲信号 (Data Pulse)：偶尔可以在线条上生成一个高亮的“光点”，从 Input 跑到 Review，模拟数据处理的过程。
-2. 增强交互反馈 (Micro-Interactions)
-让背景的装饰物与用户的操作产生联系，而不仅仅是背景：
-表单与方块联动：
-当用户聚焦 Email 输入框 时，左上角的 INPUT 方块 可以高亮或变大。
-当用户点击 登录按钮 时，右上角的 SYSTEM 方块 开始旋转加速。
-登录成功的一瞬间，OUTPUT 方块 发光。
-视差效果 (Parallax)：目前的星空背景是自动飘动的。如果能加入鼠标跟随的视差效果（鼠标移动时，近处的方块移动快，远处的星星移动慢），会瞬间增加空间的深邃感。
-3. 深化 Neo-Brutalism 风格细节
-新粗野主义强调高对比、粗边框和几何感：
-更硬朗的阴影：目前的 shadow-nb 看起来还不错，但可以尝试移除所有模糊（blur），使用纯粹的硬阴影（solid drop shadow），例如 box-shadow: 6px 6px 0px 0px #000。这会让 UI 看起来更“脆”、更有力量感。
-装饰性网格 (Grid Lines)：在背景的最底层叠加一层极淡的工程网格线（就像蓝图纸或示波器背景），配合偶尔闪烁的坐标数字，能增强“系统”、“工程”和“严谨”的氛围。
-Glitch / CRT 效果：在 Logo (Asig) 或者卡片的边框上，添加轻微的 RGB 色散 或 Glitch（故障）效果，增加一种复古科幻（Retro-SciFi）的味道。
-4. 排版与文字 (Typography)
-打字机效果：副标题 "Optimization Protocol Initiated" 既然是代码风格的文字，可以加上打字机动画（Typewriter effect），让它像终端机一样一个字一个字打出来，最后光标闪烁。
-标签化设计：在卡片的角落或边缘增加一些看起来像“系统状态标签”的小元素，比如 [STATUS: ONLINE], [v1.0.2], [SECURE]，使用极小的等宽字体，增加精密仪器的感觉。
-5. 登录卡片的质感
-毛玻璃的边界：目前的卡片背景是纯色的（或轻微渐变）。可以尝试让卡片的边框（Border）本身发光，或者给卡片加一个极细的内发光（Inner Glow），让它看起来像是一块悬浮在太空中的显示屏。
-加载状态可视化：当用户点击登录等待 API 响应时，不要只转圈圈。可以让连接四个方块的线条疯狂加速流动，或者卡片本身进行一次“系统自检”的进度条扫描。
-
-
-
-
-
- -->
+### 主题变量
+应用根据选定的主题（如 Amber）将 CSS 变量注入到 `:root` 中：
+*   `--color-app-bg`: 深色背景（例如 Amber 主题下的深棕色）。
+*   `--color-card-bg`: 卡片背景（稍亮）。
+*   `--color-accent`: 主要交互颜色（Amber-600）。
+*   `--color-border`: 边框颜色（与强调色或黑色匹配）。
